@@ -1,105 +1,106 @@
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Method not allowed"
-    });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const { message } = req.body || {};
+
+  if (!message) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+
+  // Try Gemini first
   try {
-    const { message } = req.body || {};
+    const geminiKey = process.env.GEMINI_API_KEY;
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Message is required"
-      });
-    }
-
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return res.status(500).json({
-        error: "Gemini API key is missing in Vercel."
-      });
-    }
-
-    let lastError = "Gemini is temporarily unavailable.";
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const controller = new AbortController();
-
-        const timeout = setTimeout(
-          () => controller.abort(),
-          30000
-        );
-
-        const response = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" +
-            apiKey,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [{ text: message }]
-                }
-              ]
-            }),
-            signal: controller.signal
-          }
-        );
-
-        clearTimeout(timeout);
-
-        const data = await response.json();
-
-        if (response.ok) {
-          const reply =
-            data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-          if (reply) {
-            return res.status(200).json({ reply });
-          }
-
-          lastError = "Gemini returned an empty response.";
-        } else {
-          lastError =
-            data.error?.message || "Gemini API error";
-
-          if (
-            response.status !== 429 &&
-            response.status !== 500 &&
-            response.status !== 503
-          ) {
-            return res.status(response.status).json({
-              error: lastError
-            });
-          }
+    if (geminiKey) {
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" +
+          geminiKey,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: message }] }]
+          }),
+          signal: AbortSignal.timeout(25000)
         }
-      } catch (error) {
-        lastError =
-          error.name === "AbortError"
-            ? "Gemini response timed out."
-            : "Connection to Gemini failed.";
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (reply) {
+          return res.status(200).json({
+            reply,
+            provider: "Gemini"
+          });
+        }
       }
 
-      if (attempt < 2) {
-        await new Promise(resolve =>
-          setTimeout(resolve, 2000)
-        );
-      }
+      console.log("Gemini unavailable:", data.error?.message);
+    }
+  } catch (error) {
+    console.log("Gemini failed:", error.message);
+  }
+
+  // If Gemini fails, try Groq
+  try {
+    const groqKey = process.env.GROQ_API_KEY;
+
+    if (!groqKey) {
+      return res.status(500).json({
+        error: "Groq API key is missing in Vercel."
+      });
     }
 
-    return res.status(503).json({
-      error: lastError
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + groqKey
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            {
+              role: "user",
+              content: message
+            }
+          ]
+        }),
+        signal: AbortSignal.timeout(25000)
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: data.error?.message || "Groq API error"
+      });
+    }
+
+    const reply = data.choices?.[0]?.message?.content;
+
+    if (!reply) {
+      return res.status(503).json({
+        error: "No response received from Groq."
+      });
+    }
+
+    return res.status(200).json({
+      reply,
+      provider: "Groq"
     });
 
   } catch (error) {
-    return res.status(500).json({
-      error: "Server error. Please try again."
+    return res.status(503).json({
+      error: "Both AI providers are temporarily unavailable."
     });
   }
 }
