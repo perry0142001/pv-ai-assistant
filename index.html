@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PV AI - Your Smart Assistant</title>
+
+<style>
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f1f4fa;
+}
+header {
+  background:linear-gradient(120deg,#123c75,#1678c8);
+  color:white;
+  padding:22px;
+  text-align:center;
+}
+header h1 { margin:0; }
+header p { margin:8px 0 0; }
+.container {
+  max-width:750px;
+  margin:20px auto;
+  padding:15px;
+}
+.buttons {
+  display:flex;
+  gap:10px;
+}
+button {
+  cursor:pointer;
+  border:0;
+  border-radius:10px;
+  padding:12px;
+}
+.mode {
+  flex:1;
+  background:#dceaff;
+  color:#12457d;
+  font-weight:bold;
+}
+#chat {
+  background:white;
+  height:55vh;
+  min-height:300px;
+  overflow-y:auto;
+  padding:15px;
+  margin-top:15px;
+  border-radius:15px;
+}
+.msg {
+  padding:12px;
+  margin:10px 0;
+  border-radius:12px;
+  max-width:85%;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
+.bot { background:#eaf1fc; }
+.user {
+  background:#176bc1;
+  color:white;
+  margin-left:auto;
+}
+.inputbox {
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+}
+input {
+  flex:1;
+  min-width:0;
+  padding:14px;
+  border:1px solid #bbb;
+  border-radius:10px;
+  font-size:16px;
+}
+.send {
+  background:#176bc1;
+  color:white;
+}
+.voice {
+  background:#e1e9f7;
+}
+footer {
+  text-align:center;
+  color:#777;
+  padding:15px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>🤖 PV AI</h1>
+<p>Your Smart Assistant | Powered by AI</p>
+</header>
+
+<div class="container">
+
+<div class="buttons">
+<button class="mode" onclick="setMode('general')">
+🌐 General AI
+</button>
+<button class="mode" onclick="setMode('property')">
+🏡 PV Property
+</button>
+</div>
+
+<div id="chat">
+<div class="msg bot">
+🙏 Welcome to PV AI!
+
+Ask me anything in Gujarati, Hindi or English.
+
+I can help with general questions and property-related enquiries.
+</div>
+</div>
+
+<div class="inputbox">
+<input id="question"
+placeholder="Type your question..."
+onkeydown="if(event.key==='Enter')sendMessage()">
+
+<button class="voice" onclick="speakInput()">🎤</button>
+<button class="send" onclick="sendMessage()">Send</button>
+</div>
+
+</div>
+
+<footer>
+PV AI © 2026 | Reference by PV Property
+<br>7984667329
+</footer>
+
+<script>
+let currentMode = "general";
+
+function setMode(mode) {
+ currentMode = mode;
+ addMessage(
+ mode === "property"
+ ? "PV Property Assistant selected. Ask about land, plots, flats or real estate."
+ : "General AI selected. Ask me anything.",
+ "bot"
+ );
+}
+
+function addMessage(text,type) {
+ const chat = document.getElementById("chat");
+ const div = document.createElement("div");
+ div.className = "msg " + type;
+ div.textContent = text;
+ chat.appendChild(div);
+ chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendMessage() {
+ const input = document.getElementById("question");
+ const question = input.value.trim();
+ if(!question) return;
+
+ addMessage(question,"user");
+ input.value = "";
+
+ addMessage("AI connection will be activated in the next step.","bot");
+}
+
+function speakInput() {
+ const SpeechRecognition =
+ window.SpeechRecognition || window.webkitSpeechRecognition;
+
+ if(!SpeechRecognition) {
+   alert("Voice input is not supported in this browser.");
+   return;
+ }
+
+ const recognition = new SpeechRecognition();
+ recognition.lang = "gu-IN";
+ recognition.start();
+
+ recognition.onresult = function(event) {
+   document.getElementById("question").value =
+   event.results[0][0].transcript;
+ };
+}
+</script>
+
+</body>
+</html>
